@@ -1,384 +1,264 @@
-import { useState } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Settings, AlertTriangle, Clock, Calendar, ArrowRight } from "lucide-react"
 
-import { Header } from '@/components/Header';
-import { ProductionSafetyBanner } from '@/components/ProductionSafetyBanner';
-import { DashboardHealthBanner } from '@/components/DashboardHealthBanner';
-import { ConfigurationStatus } from '@/components/ConfigurationStatus';
-import { GlobalSearch } from '@/components/GlobalSearch';
-import { RefreshButton } from '@/components/RefreshButton';
-import { AlertTestButton } from '@/components/AlertTestButton';
-import { EnhancedSecurityMetrics } from '@/components/EnhancedSecurityMetrics';
-import { EnhancedAppsTab } from '@/components/EnhancedAppsTab';
-import { SecurityInsightsTab } from '@/components/SecurityInsightsTab';
-import { GlobalAdminRiskTab } from '@/components/GlobalAdminRiskTab';
-import { GuestsTab } from '@/components/GuestsTab';
-import { CredentialHygieneTab } from '@/components/CredentialHygieneTab';
-import { ConditionalAccessTab } from '@/components/ConditionalAccessTab';
-import { RoleBasedAccessTab } from '@/components/RoleBasedAccessTab';
-import LiveAuthMapTab from '@/components/LiveAuthMapTab';
-import { PolicyGapsTab } from '@/components/PolicyGapsTab';
-import { ExportReportsTab } from '@/components/ExportReportsTab';
-import { AlertsTab } from '@/components/AlertsTab';
-import { DiagnosticsTab } from '@/components/DiagnosticsTab';
-import { CredentialExpirationTimeline } from '@/components/CredentialExpirationTimeline';
-import { useGraphData } from '@/hooks/useGraphData';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entra Security Monitor - Real-time Entra ID Security Monitoring</title>
+    <meta name="description" content="Monitor Entra ID security risks and expiring secrets in real-time. Comprehensive security monitoring dashboard for Azure AD environments.">
+    <meta name="author" content="Shaun Hardneck - That Lazy Admin">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Entra Security Monitor">
+    <meta property="og:description" content="Monitor Entra ID security risks and expiring secrets in real-time">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'%3E%3Cpath d='M12 1l8.5 3v6.5c0 5.25-3.25 10.25-8.5 12-5.25-1.75-8.5-6.75-8.5-12V4L12 1z'/%3E%3C/svg%3E" type="image/svg+xml">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .feature-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .deploy-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .deploy-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .secondary-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .secondary-btn:hover {
+            background-color: #f3f4f6;
+            transform: translateY(-1px);
+        }
+        
+        .hero-icon {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: translatey(0px); }
+            50% { transform: translatey(-20px); }
+            100% { transform: translatey(0px); }
+        }
+    </style>
+</head>
 
-// Import the moved components for the Security tab
-import { TenantScoreEngine } from '@/components/TenantScoreEngine';
-import { TenantAttackSurfaceHeatmap } from '@/components/TenantAttackSurfaceHeatmap';
-
-export default function Index() {
-  const [activeTab, setActiveTab] = useState("overview");
-  const { 
-    applications, 
-    orphanedApps,
-    securityInsights,
-    globalAdminInsights,
-    directoryRoles,
-    userRoleDetails,
-    externalAccessInsights,
-    isLoading, 
-    error, 
-    refreshAll,
-    sendTestAlert,
-    useRealData
-  } = useGraphData();
-
-  const handleTestAlert = async () => {
-    try {
-      await sendTestAlert();
-    } catch (error) {
-      console.error('Failed to send test alert:', error);
-    }
-  };
-
-  // Calculate credential-focused metrics
-  const expiredCredentials = applications.filter(app => 
-    (app.secrets && app.secrets.some(secret => new Date(secret.endDateTime) < new Date())) ||
-    (app.certificates && app.certificates.some(cert => new Date(cert.endDateTime) < new Date()))
-  );
-
-  const expiringCredentials = applications.filter(app => {
-    const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    return (app.secrets && app.secrets.some(secret => {
-      const endDate = new Date(secret.endDateTime);
-      return endDate > now && endDate <= thirtyDaysFromNow;
-    })) || (app.certificates && app.certificates.some(cert => {
-      const endDate = new Date(cert.endDateTime);
-      return endDate > now && endDate <= thirtyDaysFromNow;
-    }));
-  });
-
-  const noCredentials = applications.filter(app => 
-    (!app.secrets || app.secrets.length === 0) && 
-    (!app.certificates || app.certificates.length === 0)
-  );
-
-  // Status counts for header
-  const statusCounts = {
-    critical: expiredCredentials.length,
-    warning: expiringCredentials.length,
-    info: 0,
-    total: applications.length,
-    active: applications.length - expiredCredentials.length - expiringCredentials.length - noCredentials.length,
-    expiring: expiringCredentials.length,
-    expired: expiredCredentials.length,
-    noCredentials: noCredentials.length
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <Header 
-        onSettingsClick={() => {}}
-        statusCounts={statusCounts}
-      />
-      
-      {/* Production Safety Banner */}
-      <ProductionSafetyBanner 
-        useRealData={useRealData}
-        canUseMockData={false}
-        isLoading={isLoading}
-      />
-      
-      {/* Dashboard Health Banner - only show when using real data */}
-      {useRealData && (
-        <DashboardHealthBanner 
-          apps={applications}
-          securityInsights={securityInsights}
-          statusCounts={statusCounts}
-          lastRefreshTime={new Date()}
-          onRefresh={refreshAll}
-        />
-      )}
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="space-y-6">
-          {/* Configuration Status */}
-          <ConfigurationStatus />
-          
-          {/* Global Search */}
-          <GlobalSearch />
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="apps">Apps</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
-              <TabsTrigger value="admins">Admins</TabsTrigger>
-              <TabsTrigger value="guests">Guests</TabsTrigger>
-              <TabsTrigger value="credentials">Credentials</TabsTrigger>
-              <TabsTrigger value="access">Access</TabsTrigger>
-              <TabsTrigger value="reports">Reports</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-6">
-              {/* Clickable Credential Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card 
-                  className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setActiveTab("credentials")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-red-800 dark:text-red-300">Expired Credentials</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                      <ArrowRight className="h-3 w-3 text-red-600" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-red-600">{expiredCredentials.length}</div>
-                    <p className="text-xs text-red-600">Click to manage</p>
-                  </CardContent>
-                </Card>
-
-                <Card 
-                  className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setActiveTab("credentials")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Expiring Soon</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-yellow-600" />
-                      <ArrowRight className="h-3 w-3 text-yellow-600" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-600">{expiringCredentials.length}</div>
-                    <p className="text-xs text-yellow-600">Within 30 days</p>
-                  </CardContent>
-                </Card>
-
-                <Card 
-                  className="border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/20 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setActiveTab("credentials")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-800 dark:text-gray-300">No Credentials</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-gray-600" />
-                      <ArrowRight className="h-3 w-3 text-gray-600" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-gray-600">{noCredentials.length}</div>
-                    <p className="text-xs text-gray-600">Apps without credentials</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-green-800 dark:text-green-300">Healthy Apps</CardTitle>
-                    <Calendar className="h-4 w-4 text-green-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{statusCounts.active}</div>
-                    <p className="text-xs text-green-600">Valid credentials</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <RefreshButton onRefresh={refreshAll} isLoading={isLoading} />
-                    <AlertTestButton onTest={handleTestAlert} />
-                    <Button variant="outline" className="w-full">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Settings
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Credential Expiration Timeline */}
-              <CredentialExpirationTimeline applications={applications} />
-
-              {/* Critical Credentials Alert - Limited View */}
-              {expiredCredentials.length > 0 && (
-                <Card className="border-red-200 dark:border-red-800">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-red-600">
-                        <AlertTriangle className="h-5 w-5" />
-                        Most Critical Expired Credentials
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setActiveTab("credentials")}
-                        className="border-red-300 text-red-700 hover:bg-red-100"
-                      >
-                        View All {expiredCredentials.length}
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {expiredCredentials.slice(0, 3).map((app, index) => {
-                        const expiredSecrets = app.secrets?.filter(s => new Date(s.endDateTime) < new Date()).length || 0;
-                        const expiredCerts = app.certificates?.filter(c => new Date(c.endDateTime) < new Date()).length || 0;
-                        
-                        return (
-                          <div key={app.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                            <div>
-                              <div className="font-semibold text-red-800 dark:text-red-300">{app.displayName}</div>
-                              <div className="text-sm text-red-600 dark:text-red-400">
-                                {expiredSecrets} expired secrets, {expiredCerts} expired certificates
-                              </div>
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="border-red-300 text-red-700 hover:bg-red-100"
-                              onClick={() => setActiveTab("credentials")}
-                            >
-                              Manage
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="apps">
-              <EnhancedAppsTab
-                apps={applications}
-                orphanedApps={orphanedApps}
-                isLoading={isLoading}
-                error={error}
-                onRefresh={refreshAll}
-                useRealData={useRealData}
-              />
-            </TabsContent>
-
-            <TabsContent value="security">
-              <SecurityInsightsTab 
-                data={securityInsights}
-                isLoading={isLoading}
-                error={error}
-                onRefresh={refreshAll}
-              />
-            </TabsContent>
-
-            <TabsContent value="admins">
-              <GlobalAdminRiskTab 
-                data={globalAdminInsights} 
-                isLoading={isLoading}
-                error={error}
-                onRefresh={refreshAll}
-              />
-            </TabsContent>
-
-            <TabsContent value="guests">
-              <GuestsTab data={externalAccessInsights} isLoading={isLoading} />
-            </TabsContent>
-
-            <TabsContent value="credentials">
-              <CredentialHygieneTab apps={applications} isLoading={isLoading} />
-            </TabsContent>
-
-            <TabsContent value="access">
-              <Tabs defaultValue="conditional" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="conditional">Conditional Access</TabsTrigger>
-                  <TabsTrigger value="roles">Role-Based Access</TabsTrigger>
-                  <TabsTrigger value="live">Live Auth Map</TabsTrigger>
-                  <TabsTrigger value="gaps">Policy Gaps</TabsTrigger>
-                </TabsList>
+<body class="bg-gray-50">
+    <!-- Hero Section -->
+    <section class="gradient-bg min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto text-center text-white">
+            <!-- Floating Security Icon -->
+            <div class="hero-icon mb-8">
+                <svg class="w-20 h-20 mx-auto text-white opacity-90" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 1l8.5 3v6.5c0 5.25-3.25 10.25-8.5 12-5.25-1.75-8.5-6.75-8.5-12V4L12 1z"/>
+                </svg>
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+                Entra Security Monitor
+            </h1>
+            
+            <p class="text-xl md:text-2xl mb-12 opacity-90 font-light max-w-3xl mx-auto leading-relaxed">
+                Monitor Entra ID security risks and expiring secrets in real-time.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https://raw.githubusercontent.com/YOUR-USERNAME/entra-security-monitor/main/azuredeploy.json" 
+                   class="deploy-btn inline-flex items-center px-8 py-4 text-lg font-semibold text-white rounded-lg shadow-lg">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    Deploy to Azure
+                </a>
                 
-                <TabsContent value="conditional">
-                  <ConditionalAccessTab 
-                    data={securityInsights}
-                    isLoading={isLoading}
-                    error={error}
-                    onRefresh={refreshAll}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="roles">
-                  <RoleBasedAccessTab 
-                    userRoleDetails={userRoleDetails}
-                    directoryRoles={directoryRoles}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="live">
-                  <LiveAuthMapTab onRefresh={refreshAll} />
-                </TabsContent>
-                
-                <TabsContent value="gaps">
-                  <PolicyGapsTab 
-                    policyGapsData={null}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            <TabsContent value="reports">
-              <Tabs defaultValue="export" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="export">Export Reports</TabsTrigger>
-                  <TabsTrigger value="alerts">Alerts</TabsTrigger>
-                  <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="export">
-                  <ExportReportsTab 
-                    apps={applications}
-                    securityData={securityInsights}
-                    alerts={[]}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="alerts">
-                  <AlertsTab isLoading={isLoading} />
-                </TabsContent>
-                
-                <TabsContent value="diagnostics">
-                  <DiagnosticsTab isLoading={isLoading} />
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-          </Tabs>
+                <a href="#setup" 
+                   class="secondary-btn inline-flex items-center px-8 py-4 text-lg font-semibold text-white border-2 border-white rounded-lg hover:bg-white hover:text-gray-800">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    View Documentation
+                </a>
+            </div>
         </div>
-      </main>
-    </div>
-  );
-}
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Comprehensive Security Monitoring
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Get complete visibility into your Entra ID environment with real-time monitoring and actionable insights.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Real-time Risk Monitoring</h3>
+                    <p class="text-gray-600">Monitor security risks across your Entra ID environment with live updates and instant alerts.</p>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Credential Expiration Tracking</h3>
+                    <p class="text-gray-600">Track expiring secrets and certificates with automated alerts and rotation recommendations.</p>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Conditional Access Analysis</h3>
+                    <p class="text-gray-600">Analyze conditional access policies and identify coverage gaps in your security posture.</p>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Role-based Access Insights</h3>
+                    <p class="text-gray-600">Monitor privileged accounts and role assignments with detailed access control analytics.</p>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="feature-card bg-white p-8 rounded-xl shadow-lg">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Security Compliance Dashboard</h3>
+                    <p class="text-gray-600">Comprehensive dashboards with security metrics, compliance reports, and actionable recommendations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Setup Section -->
+    <section id="setup" class="bg-white py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-4xl font-bold text-gray-900 mb-8">
+                Quick Setup
+            </h2>
+            
+            <div class="bg-gray-50 rounded-xl p-8 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="text-center">
+                        <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">1</div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Deploy</h3>
+                        <p class="text-gray-600 text-sm">Click "Deploy to Azure" to launch the ARM template</p>
+                    </div>
+                    
+                    <div class="text-center">
+                        <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">2</div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Configure</h3>
+                        <p class="text-gray-600 text-sm">Set up your Entra ID app registration and permissions</p>
+                    </div>
+                    
+                    <div class="text-center">
+                        <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">3</div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Monitor</h3>
+                        <p class="text-gray-600 text-sm">Start monitoring your security posture in real-time</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="https://github.com/YOUR-USERNAME/entra-security-monitor" 
+                   class="inline-flex items-center px-6 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"/>
+                    </svg>
+                    View on GitHub
+                </a>
+                
+                <a href="https://github.com/YOUR-USERNAME/entra-security-monitor/blob/main/README.md" 
+                   class="inline-flex items-center px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Documentation
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center">
+                <div class="flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 mr-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 1l8.5 3v6.5c0 5.25-3.25 10.25-8.5 12-5.25-1.75-8.5-6.75-8.5-12V4L12 1z"/>
+                    </svg>
+                    <span class="text-xl font-semibold">Entra Security Monitor</span>
+                </div>
+                
+                <p class="text-gray-400 mb-6">
+                    Developed by <span class="text-white font-medium">Shaun Hardneck</span> · 
+                    <a href="https://github.com/YOUR-USERNAME/entra-security-monitor" 
+                       class="text-blue-400 hover:text-blue-300 transition-colors">
+                        View Source on GitHub
+                    </a>
+                </p>
+                
+                <div class="border-t border-gray-800 pt-6">
+                    <p class="text-sm text-gray-500">
+                        © 2024 Entra Security Monitor. Open source security monitoring for Azure AD environments.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
