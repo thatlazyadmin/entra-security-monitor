@@ -1,91 +1,384 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Deploy and explore the Entra Security Monitor platform to enhance your Microsoft 365 security visibility." />
-  <title>Entra Security Monitor</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f4f6f8;
-      margin: 0;
-      padding: 0;
-      color: #333;
-    }
-    header {
-      background-color: #1e3a8a;
-      color: white;
-      padding: 2rem;
-      text-align: center;
-    }
-    main {
-      max-width: 800px;
-      margin: 3rem auto;
-      background: white;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    h1 { font-size: 2.25rem; margin-bottom: 1rem; }
-    h2 { font-size: 1.5rem; margin-top: 2rem; }
-    p { line-height: 1.6; }
-    a.button {
-      display: inline-block;
-      margin-top: 2rem;
-      background: #2563eb;
-      color: white;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    footer {
-      text-align: center;
-      margin: 4rem 0 1rem;
-      color: #888;
-      font-size: 0.9rem;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Entra Security Monitor</h1>
-    <p>A unified view into your Microsoft Entra security posture</p>
-  </header>
-  <main>
-    <h2>✨ What is this?</h2>
-    <p>Entra Security Monitor is a plug-and-play web platform designed for IT administrators, security analysts, and compliance teams. It provides powerful visibility into Entra ID app secrets, certificates, conditional access activity, and risky sign-ins without requiring user authentication.</p>
+import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Settings, AlertTriangle, Clock, Calendar, ArrowRight } from "lucide-react"
 
-    <h2>🌐 Deploy in One Click</h2>
-    <p>Launch your own hosted version on Azure in seconds:</p>
-    <a class="button" href="https://portal.azure.com/#create/Microsoft.Template/uri/https://raw.githubusercontent.com/YOUR-USERNAME/entra-security-monitor/main/azuredeploy.json">Deploy to Azure</a>
+import { Header } from '@/components/Header';
+import { ProductionSafetyBanner } from '@/components/ProductionSafetyBanner';
+import { DashboardHealthBanner } from '@/components/DashboardHealthBanner';
+import { ConfigurationStatus } from '@/components/ConfigurationStatus';
+import { GlobalSearch } from '@/components/GlobalSearch';
+import { RefreshButton } from '@/components/RefreshButton';
+import { AlertTestButton } from '@/components/AlertTestButton';
+import { EnhancedSecurityMetrics } from '@/components/EnhancedSecurityMetrics';
+import { EnhancedAppsTab } from '@/components/EnhancedAppsTab';
+import { SecurityInsightsTab } from '@/components/SecurityInsightsTab';
+import { GlobalAdminRiskTab } from '@/components/GlobalAdminRiskTab';
+import { GuestsTab } from '@/components/GuestsTab';
+import { CredentialHygieneTab } from '@/components/CredentialHygieneTab';
+import { ConditionalAccessTab } from '@/components/ConditionalAccessTab';
+import { RoleBasedAccessTab } from '@/components/RoleBasedAccessTab';
+import LiveAuthMapTab from '@/components/LiveAuthMapTab';
+import { PolicyGapsTab } from '@/components/PolicyGapsTab';
+import { ExportReportsTab } from '@/components/ExportReportsTab';
+import { AlertsTab } from '@/components/AlertsTab';
+import { DiagnosticsTab } from '@/components/DiagnosticsTab';
+import { CredentialExpirationTimeline } from '@/components/CredentialExpirationTimeline';
+import { useGraphData } from '@/hooks/useGraphData';
 
-    <h2>🔐 Secure by Design</h2>
-    <p>The platform uses an Azure App Registration with Microsoft Graph read-only permissions. All permissions required are minimal and follow the principle of least privilege.</p>
+// Import the moved components for the Security tab
+import { TenantScoreEngine } from '@/components/TenantScoreEngine';
+import { TenantAttackSurfaceHeatmap } from '@/components/TenantAttackSurfaceHeatmap';
 
-    <h2>✍️ Setup Guide</h2>
-    <ol>
-      <li>Deploy the Web App using the button above.</li>
-      <li>Create an App Registration in Entra ID.</li>
-      <li>Assign <code>Application.Read.All</code>, <code>AuditLog.Read.All</code>, <code>Policy.Read.All</code> permissions.</li>
-      <li>Generate a client secret (minimum 6 months validity).</li>
-      <li>Paste the <strong>App ID</strong> and <strong>Secret</strong> into Azure Web App configuration settings.</li>
-      <li>Restart the Web App.</li>
-    </ol>
+export default function Index() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const { 
+    applications, 
+    orphanedApps,
+    securityInsights,
+    globalAdminInsights,
+    directoryRoles,
+    userRoleDetails,
+    externalAccessInsights,
+    isLoading, 
+    error, 
+    refreshAll,
+    sendTestAlert,
+    useRealData
+  } = useGraphData();
 
-    <h2>✨ Features</h2>
-    <ul>
-      <li>Monitor expiring secrets & certificates</li>
-      <li>Review credential hygiene across your tenant</li>
-      <li>Drill into risky sign-ins, user activity, and app access events</li>
-      <li>Visual insights for security and compliance reporting</li>
-    </ul>
-  </main>
-  <footer>
-    Developed with passion by Shaun Hardneck
-  </footer>
-</body>
-</html>
+  const handleTestAlert = async () => {
+    try {
+      await sendTestAlert();
+    } catch (error) {
+      console.error('Failed to send test alert:', error);
+    }
+  };
+
+  // Calculate credential-focused metrics
+  const expiredCredentials = applications.filter(app => 
+    (app.secrets && app.secrets.some(secret => new Date(secret.endDateTime) < new Date())) ||
+    (app.certificates && app.certificates.some(cert => new Date(cert.endDateTime) < new Date()))
+  );
+
+  const expiringCredentials = applications.filter(app => {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    return (app.secrets && app.secrets.some(secret => {
+      const endDate = new Date(secret.endDateTime);
+      return endDate > now && endDate <= thirtyDaysFromNow;
+    })) || (app.certificates && app.certificates.some(cert => {
+      const endDate = new Date(cert.endDateTime);
+      return endDate > now && endDate <= thirtyDaysFromNow;
+    }));
+  });
+
+  const noCredentials = applications.filter(app => 
+    (!app.secrets || app.secrets.length === 0) && 
+    (!app.certificates || app.certificates.length === 0)
+  );
+
+  // Status counts for header
+  const statusCounts = {
+    critical: expiredCredentials.length,
+    warning: expiringCredentials.length,
+    info: 0,
+    total: applications.length,
+    active: applications.length - expiredCredentials.length - expiringCredentials.length - noCredentials.length,
+    expiring: expiringCredentials.length,
+    expired: expiredCredentials.length,
+    noCredentials: noCredentials.length
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <Header 
+        onSettingsClick={() => {}}
+        statusCounts={statusCounts}
+      />
+      
+      {/* Production Safety Banner */}
+      <ProductionSafetyBanner 
+        useRealData={useRealData}
+        canUseMockData={false}
+        isLoading={isLoading}
+      />
+      
+      {/* Dashboard Health Banner - only show when using real data */}
+      {useRealData && (
+        <DashboardHealthBanner 
+          apps={applications}
+          securityInsights={securityInsights}
+          statusCounts={statusCounts}
+          lastRefreshTime={new Date()}
+          onRefresh={refreshAll}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        <div className="space-y-6">
+          {/* Configuration Status */}
+          <ConfigurationStatus />
+          
+          {/* Global Search */}
+          <GlobalSearch />
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="apps">Apps</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="admins">Admins</TabsTrigger>
+              <TabsTrigger value="guests">Guests</TabsTrigger>
+              <TabsTrigger value="credentials">Credentials</TabsTrigger>
+              <TabsTrigger value="access">Access</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              {/* Clickable Credential Overview Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card 
+                  className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setActiveTab("credentials")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-red-800 dark:text-red-300">Expired Credentials</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <ArrowRight className="h-3 w-3 text-red-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">{expiredCredentials.length}</div>
+                    <p className="text-xs text-red-600">Click to manage</p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setActiveTab("credentials")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Expiring Soon</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <ArrowRight className="h-3 w-3 text-yellow-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600">{expiringCredentials.length}</div>
+                    <p className="text-xs text-yellow-600">Within 30 days</p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/20 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setActiveTab("credentials")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-800 dark:text-gray-300">No Credentials</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-gray-600" />
+                      <ArrowRight className="h-3 w-3 text-gray-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-gray-600">{noCredentials.length}</div>
+                    <p className="text-xs text-gray-600">Apps without credentials</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-green-800 dark:text-green-300">Healthy Apps</CardTitle>
+                    <Calendar className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">{statusCounts.active}</div>
+                    <p className="text-xs text-green-600">Valid credentials</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <RefreshButton onRefresh={refreshAll} isLoading={isLoading} />
+                    <AlertTestButton onTest={handleTestAlert} />
+                    <Button variant="outline" className="w-full">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Credential Expiration Timeline */}
+              <CredentialExpirationTimeline applications={applications} />
+
+              {/* Critical Credentials Alert - Limited View */}
+              {expiredCredentials.length > 0 && (
+                <Card className="border-red-200 dark:border-red-800">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Most Critical Expired Credentials
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setActiveTab("credentials")}
+                        className="border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        View All {expiredCredentials.length}
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {expiredCredentials.slice(0, 3).map((app, index) => {
+                        const expiredSecrets = app.secrets?.filter(s => new Date(s.endDateTime) < new Date()).length || 0;
+                        const expiredCerts = app.certificates?.filter(c => new Date(c.endDateTime) < new Date()).length || 0;
+                        
+                        return (
+                          <div key={app.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                            <div>
+                              <div className="font-semibold text-red-800 dark:text-red-300">{app.displayName}</div>
+                              <div className="text-sm text-red-600 dark:text-red-400">
+                                {expiredSecrets} expired secrets, {expiredCerts} expired certificates
+                              </div>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="border-red-300 text-red-700 hover:bg-red-100"
+                              onClick={() => setActiveTab("credentials")}
+                            >
+                              Manage
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="apps">
+              <EnhancedAppsTab
+                apps={applications}
+                orphanedApps={orphanedApps}
+                isLoading={isLoading}
+                error={error}
+                onRefresh={refreshAll}
+                useRealData={useRealData}
+              />
+            </TabsContent>
+
+            <TabsContent value="security">
+              <SecurityInsightsTab 
+                data={securityInsights}
+                isLoading={isLoading}
+                error={error}
+                onRefresh={refreshAll}
+              />
+            </TabsContent>
+
+            <TabsContent value="admins">
+              <GlobalAdminRiskTab 
+                data={globalAdminInsights} 
+                isLoading={isLoading}
+                error={error}
+                onRefresh={refreshAll}
+              />
+            </TabsContent>
+
+            <TabsContent value="guests">
+              <GuestsTab data={externalAccessInsights} isLoading={isLoading} />
+            </TabsContent>
+
+            <TabsContent value="credentials">
+              <CredentialHygieneTab apps={applications} isLoading={isLoading} />
+            </TabsContent>
+
+            <TabsContent value="access">
+              <Tabs defaultValue="conditional" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="conditional">Conditional Access</TabsTrigger>
+                  <TabsTrigger value="roles">Role-Based Access</TabsTrigger>
+                  <TabsTrigger value="live">Live Auth Map</TabsTrigger>
+                  <TabsTrigger value="gaps">Policy Gaps</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="conditional">
+                  <ConditionalAccessTab 
+                    data={securityInsights}
+                    isLoading={isLoading}
+                    error={error}
+                    onRefresh={refreshAll}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="roles">
+                  <RoleBasedAccessTab 
+                    userRoleDetails={userRoleDetails}
+                    directoryRoles={directoryRoles}
+                    isLoading={isLoading}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="live">
+                  <LiveAuthMapTab onRefresh={refreshAll} />
+                </TabsContent>
+                
+                <TabsContent value="gaps">
+                  <PolicyGapsTab 
+                    policyGapsData={null}
+                    isLoading={isLoading}
+                  />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            <TabsContent value="reports">
+              <Tabs defaultValue="export" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="export">Export Reports</TabsTrigger>
+                  <TabsTrigger value="alerts">Alerts</TabsTrigger>
+                  <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="export">
+                  <ExportReportsTab 
+                    apps={applications}
+                    securityData={securityInsights}
+                    alerts={[]}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="alerts">
+                  <AlertsTab isLoading={isLoading} />
+                </TabsContent>
+                
+                <TabsContent value="diagnostics">
+                  <DiagnosticsTab isLoading={isLoading} />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+    </div>
+  );
+}
