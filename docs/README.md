@@ -84,4 +84,4 @@ Submit an issue or pull request via GitHub:
 
 ---
 
-_© 2025 Shaun Hardneck | URBANNERD CONSULTING_
+_© 2025 Shaun Hardneck | www.thatlazyadmin.com
