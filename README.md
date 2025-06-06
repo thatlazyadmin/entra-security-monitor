@@ -1,1 +1,1 @@
-# entra-security-monitor
+# Entra-security-monitor
